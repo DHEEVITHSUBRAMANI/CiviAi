@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, Upload, MapPin, Brain, Loader2, CheckCircle2, AlertCircle,
-  Edit3, X, Sparkles, FileText, Send,
+  Edit3, X, Sparkles, FileText, Send, Navigation, MapPinned, LocateFixed,
 } from 'lucide-react';
 import { DashboardLayout } from '../components/DashboardLayout';
 import { Card } from '../components/ui/Card';
@@ -45,6 +45,7 @@ export function SubmitComplaintPage() {
   });
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [locationMode, setLocationMode] = useState<'live' | 'manual' | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export function SubmitComplaintPage() {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
         }));
+        setLocationMode('live');
         setLocating(false);
         toast('success', 'Location detected', 'Your GPS location has been set.');
         checkDuplicates(pos.coords.latitude, pos.coords.longitude);
@@ -130,6 +132,7 @@ export function SubmitComplaintPage() {
 
   const handleLocationSelect = (lat: number, lng: number) => {
     setForm((f) => ({ ...f, latitude: lat, longitude: lng }));
+    setLocationMode('manual');
     checkDuplicates(lat, lng);
   };
 
@@ -460,24 +463,98 @@ export function SubmitComplaintPage() {
 
               {/* Location */}
               <Card className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-display font-semibold text-gray-900 dark:text-white">Location</h3>
-                  <Button variant="ghost" size="sm" onClick={detectLocation} loading={locating}>
-                    <MapPin className="w-4 h-4" />
-                    {locating ? 'Detecting...' : 'Use GPS'}
-                  </Button>
+                <h3 className="font-display font-semibold text-gray-900 dark:text-white mb-1">Location</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Choose how you want to set the complaint location</p>
+
+                {/* Two options */}
+                <div className="grid sm:grid-cols-2 gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={detectLocation}
+                    disabled={locating}
+                    className={cn(
+                      'flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left',
+                      locationMode === 'live'
+                        ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/30'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/20',
+                      locating && 'opacity-70 cursor-wait',
+                    )}
+                  >
+                    <div className={cn(
+                      'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors',
+                      locationMode === 'live' ? 'bg-brand-600 text-white' : 'bg-brand-100 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400',
+                    )}>
+                      {locating ? <Loader2 className="w-5 h-5 animate-spin" /> : <LocateFixed className="w-5 h-5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 dark:text-white text-sm">Use Live Location</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Detect via GPS</p>
+                    </div>
+                    {locationMode === 'live' && <CheckCircle2 className="w-5 h-5 text-brand-600 dark:text-brand-400 ml-auto shrink-0" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLocationMode('manual');
+                      if (form.latitude == null || form.longitude == null) {
+                        toast('info', 'Pick on map', 'Click anywhere on the map below to set the location.');
+                      }
+                    }}
+                    className={cn(
+                      'flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left',
+                      locationMode === 'manual'
+                        ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/30'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/20',
+                    )}
+                  >
+                    <div className={cn(
+                      'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors',
+                      locationMode === 'manual' ? 'bg-brand-600 text-white' : 'bg-brand-100 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400',
+                    )}>
+                      <MapPinned className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900 dark:text-white text-sm">Pick on Map</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Set manually</p>
+                    </div>
+                    {locationMode === 'manual' && <CheckCircle2 className="w-5 h-5 text-brand-600 dark:text-brand-400 ml-auto shrink-0" />}
+                  </button>
                 </div>
-                <SimpleMap
-                  height="300px"
-                  selectable
-                  onLocationSelect={handleLocationSelect}
-                  center={form.latitude != null && form.longitude != null ? { lat: form.latitude, lng: form.longitude } : undefined}
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  {form.latitude != null
-                    ? `Location: ${form.latitude.toFixed(4)}, ${form.longitude?.toFixed(4)}`
-                    : 'Click on the map to set the complaint location'}
-                </p>
+
+                {/* Map - shown when manual is selected or when a location is already set */}
+                {(locationMode === 'manual' || (form.latitude != null && form.longitude != null)) && (
+                  <>
+                    <SimpleMap
+                      height="300px"
+                      selectable={locationMode === 'manual' || locationMode === null}
+                      onLocationSelect={handleLocationSelect}
+                      center={form.latitude != null && form.longitude != null ? { lat: form.latitude, lng: form.longitude } : undefined}
+                    />
+                    <div className="flex items-center gap-2 mt-2">
+                      {form.latitude != null && form.longitude != null ? (
+                        <>
+                          <MapPin className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400 shrink-0" />
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {locationMode === 'live' ? 'Live GPS location: ' : 'Selected location: '}
+                            {form.latitude.toFixed(4)}, {form.longitude.toFixed(4)}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Click on the map to set the complaint location</p>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {locationMode === null && form.latitude == null && (
+                  <div className="flex items-center justify-center h-[120px] rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-dashed border-gray-200 dark:border-gray-700">
+                    <p className="text-sm text-gray-400 flex items-center gap-2">
+                      <Navigation className="w-4 h-4" />
+                      Select an option above to set location
+                    </p>
+                  </div>
+                )}
               </Card>
 
               <div className="flex gap-3">
