@@ -47,6 +47,7 @@ export function SubmitComplaintPage() {
   const [submitting, setSubmitting] = useState(false);
   const [locationMode, setLocationMode] = useState<'live' | 'manual' | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
+  const [reverseGeocoding, setReverseGeocoding] = useState(false);
 
   useEffect(() => {
     supabase.from('departments').select('name').eq('is_active', true).order('name')
@@ -92,6 +93,25 @@ export function SubmitComplaintPage() {
     }
   };
 
+  const reverseGeocode = async (lat: number, lng: number) => {
+    setReverseGeocoding(true);
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&zoom=18&addressdetails=1`,
+        { headers: { Accept: 'application/json' } },
+      );
+      if (!response.ok) throw new Error('Address lookup failed');
+      const result = await response.json() as { display_name?: string };
+      if (result.display_name) {
+        setForm((f) => ({ ...f, address: result.display_name ?? '' }));
+      }
+    } catch {
+      toast('warning', 'Address unavailable', 'The location was saved, but we could not find its street address.');
+    } finally {
+      setReverseGeocoding(false);
+    }
+  };
+
   const detectLocation = () => {
     if (!navigator.geolocation) {
       toast('warning', 'Location unavailable', 'Geolocation is not supported. Please select on map.');
@@ -108,6 +128,7 @@ export function SubmitComplaintPage() {
         setLocationMode('live');
         setLocating(false);
         toast('success', 'Location detected', 'Your GPS location has been set.');
+        void reverseGeocode(pos.coords.latitude, pos.coords.longitude);
         checkDuplicates(pos.coords.latitude, pos.coords.longitude);
       },
       () => {
@@ -133,6 +154,7 @@ export function SubmitComplaintPage() {
   const handleLocationSelect = (lat: number, lng: number) => {
     setForm((f) => ({ ...f, latitude: lat, longitude: lng }));
     setLocationMode('manual');
+    void reverseGeocode(lat, lng);
     checkDuplicates(lat, lng);
   };
 
@@ -453,10 +475,10 @@ export function SubmitComplaintPage() {
                   required
                 />
                 <Input
-                  label="Address (optional)"
+                  label="Address"
                   value={form.address}
                   onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  placeholder="e.g., 123 Main St, near City Park"
+                  placeholder="Choose a location below or enter an address"
                   icon={<MapPin className="w-4 h-4" />}
                 />
               </Card>
@@ -531,14 +553,21 @@ export function SubmitComplaintPage() {
                       onLocationSelect={handleLocationSelect}
                       center={form.latitude != null && form.longitude != null ? { lat: form.latitude, lng: form.longitude } : undefined}
                     />
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="mt-2 space-y-1.5">
                       {form.latitude != null && form.longitude != null ? (
                         <>
-                          <MapPin className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400 shrink-0" />
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            {locationMode === 'live' ? 'Live GPS location: ' : 'Selected location: '}
-                            {form.latitude.toFixed(4)}, {form.longitude.toFixed(4)}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400 shrink-0" />
+                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                              {locationMode === 'live' ? 'Live GPS location' : 'Selected location'} · {form.latitude.toFixed(4)}, {form.longitude.toFixed(4)}
+                            </p>
+                          </div>
+                          <div className="flex items-start gap-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 px-3 py-2">
+                            {reverseGeocoding ? <Loader2 className="w-3.5 h-3.5 text-brand-600 animate-spin mt-0.5 shrink-0" /> : <MapPinned className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400 mt-0.5 shrink-0" />}
+                            <p className="text-xs text-gray-700 dark:text-gray-300">
+                              {reverseGeocoding ? 'Finding the address…' : form.address || 'Address not available — you can enter it above.'}
+                            </p>
+                          </div>
                         </>
                       ) : (
                         <p className="text-xs text-gray-500 dark:text-gray-400">Click on the map to set the complaint location</p>
