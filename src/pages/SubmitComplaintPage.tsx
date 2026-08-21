@@ -113,37 +113,64 @@ export function SubmitComplaintPage() {
     }
   };
 
+  const applyLocation = (lat: number, lng: number, source: 'gps' | 'ip') => {
+    setForm((f) => ({ ...f, latitude: lat, longitude: lng }));
+    setLocationMode('live');
+    setLocating(false);
+    toast(
+      'success',
+      'Location detected',
+      source === 'gps' ? 'Your GPS location has been set.' : 'Approximate location detected from your network.',
+    );
+    void reverseGeocode(lat, lng);
+    checkDuplicates(lat, lng);
+  };
+
+  const detectViaIP = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      if (!res.ok) return false;
+      const data = await res.json() as { latitude?: number; longitude?: number };
+      if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+        applyLocation(data.latitude, data.longitude, 'ip');
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   const detectLocation = () => {
     if (!navigator.geolocation || !window.isSecureContext) {
-      setLocationMode('manual');
-      toast(
-        'warning',
-        'Live location unavailable',
-        'GPS requires a secure (HTTPS) connection. Please pick your location on the map below.',
-      );
+      setLocating(true);
+      void detectViaIP().then((ok) => {
+        setLocating(false);
+        if (!ok) {
+          setLocationMode('manual');
+          toast(
+            'warning',
+            'Live location unavailable',
+            'GPS requires HTTPS and your network location could not be detected. Please pick your location on the map below.',
+          );
+        }
+      });
       return;
     }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setForm((f) => ({
-          ...f,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        }));
-        setLocationMode('live');
-        setLocating(false);
-        toast('success', 'Location detected', 'Your GPS location has been set.');
-        void reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-        checkDuplicates(pos.coords.latitude, pos.coords.longitude);
-      },
+      (pos) => applyLocation(pos.coords.latitude, pos.coords.longitude, 'gps'),
       (err) => {
-        setLocating(false);
-        setLocationMode('manual');
-        const msg = err.code === err.PERMISSION_DENIED
-          ? 'Location permission was denied. You can still pick your location on the map below.'
-          : 'Could not detect your GPS location. You can pick it on the map below.';
-        toast('warning', 'Location unavailable', msg);
+        void detectViaIP().then((ok) => {
+          setLocating(false);
+          if (!ok) {
+            setLocationMode('manual');
+            const msg = err.code === err.PERMISSION_DENIED
+              ? 'Location permission was denied. You can still pick your location on the map below.'
+              : 'Could not detect your GPS location. You can pick it on the map below.';
+            toast('warning', 'Location unavailable', msg);
+          }
+        });
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
