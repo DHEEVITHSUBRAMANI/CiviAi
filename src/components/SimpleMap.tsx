@@ -85,8 +85,11 @@ function MapResizer({ center }: { center?: { lat: number; lng: number } }) {
     setTimeout(() => map.invalidateSize(), 100);
   }, [map]);
   useEffect(() => {
-    if (center) map.setView([center.lat, center.lng], Math.max(map.getZoom(), 15));
-  }, [center, map]);
+    if (center) {
+      map.setView([center.lat, center.lng], Math.max(map.getZoom(), 15));
+      setTimeout(() => map.invalidateSize(), 50);
+    }
+  }, [center?.lat, center?.lng, map]);
   return null;
 }
 

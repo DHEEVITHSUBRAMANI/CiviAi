@@ -132,10 +132,14 @@ export function SubmitComplaintPage() {
         void reverseGeocode(pos.coords.latitude, pos.coords.longitude);
         checkDuplicates(pos.coords.latitude, pos.coords.longitude);
       },
-      () => {
+      (err) => {
         setLocating(false);
-        toast('warning', 'Location denied', 'Please select your location on the map.');
+        const msg = err.code === err.PERMISSION_DENIED
+          ? 'Location permission denied. Please select your location on the map.'
+          : 'Could not detect your location. Please select it on the map.';
+        toast('warning', 'Location unavailable', msg);
       },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     );
   };
 
