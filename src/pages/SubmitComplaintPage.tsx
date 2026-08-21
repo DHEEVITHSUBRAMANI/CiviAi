@@ -114,8 +114,13 @@ export function SubmitComplaintPage() {
   };
 
   const detectLocation = () => {
-    if (!navigator.geolocation) {
-      toast('warning', 'Location unavailable', 'Geolocation is not supported. Please select on map.');
+    if (!navigator.geolocation || !window.isSecureContext) {
+      setLocationMode('manual');
+      toast(
+        'warning',
+        'Live location unavailable',
+        'GPS requires a secure (HTTPS) connection. Please pick your location on the map below.',
+      );
       return;
     }
     setLocating(true);
@@ -134,9 +139,10 @@ export function SubmitComplaintPage() {
       },
       (err) => {
         setLocating(false);
+        setLocationMode('manual');
         const msg = err.code === err.PERMISSION_DENIED
-          ? 'Location permission denied. Please select your location on the map.'
-          : 'Could not detect your location. Please select it on the map.';
+          ? 'Location permission was denied. You can still pick your location on the map below.'
+          : 'Could not detect your GPS location. You can pick it on the map below.';
         toast('warning', 'Location unavailable', msg);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
