@@ -37,6 +37,7 @@ export function SubmitComplaintPage() {
     title: '',
     description: '',
     category: 'Others' as IssueCategory,
+    customCategory: '',
     priority: 'Medium' as Priority,
     department: '',
     latitude: null as number | null,
@@ -168,6 +169,10 @@ export function SubmitComplaintPage() {
       toast('error', 'Description required', 'Please describe the issue.');
       return;
     }
+    if (form.category === 'Others' && !form.customCategory.trim()) {
+      toast('error', 'Category required', 'Please describe what category this issue is.');
+      return;
+    }
     if (form.latitude == null || form.longitude == null) {
       toast('error', 'Location required', 'Please set your location on the map.');
       return;
@@ -196,7 +201,7 @@ export function SubmitComplaintPage() {
           latitude: form.latitude,
           longitude: form.longitude,
           address: form.address,
-          category: form.category,
+          category: form.category === 'Others' && form.customCategory.trim() ? form.customCategory.trim() : form.category,
           priority: form.priority,
           department: form.department,
           severity: aiResult?.severity ?? 'Moderate',
@@ -227,7 +232,7 @@ export function SubmitComplaintPage() {
         action: 'AI analysis completed',
         from_status: 'submitted',
         to_status: 'department_assigned',
-        notes: `Category: ${form.category}, Priority: ${form.priority}, Department: ${form.department}`,
+        notes: `Category: ${form.category === 'Others' && form.customCategory.trim() ? form.customCategory.trim() : form.category}, Priority: ${form.priority}, Department: ${form.department}`,
       });
 
       toast('success', 'Complaint submitted!', 'Your issue has been reported and routed to the department.');
@@ -402,9 +407,13 @@ export function SubmitComplaintPage() {
                         }}>
                           {ISSUE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                         </Select>
-                        <Select label="Priority" value={form.priority} onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as Priority }))}>
-                          {Object.keys(PRIORITY_CONFIG).map((p) => <option key={p} value={p}>{p}</option>)}
-                        </Select>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Priority</label>
+                          <div className="px-4 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                            <span>{form.priority}</span>
+                            <span className="text-xs text-gray-400">(auto-assigned)</span>
+                          </div>
+                        </div>
                         <Select label="Department" value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))}>
                           <option value="">Select...</option>
                           {departments.length > 0 ? departments.map((d) => <option key={d} value={d}>{d}</option>) : Array.from(new Set(Object.values(CATEGORY_DEPARTMENT_MAP))).map((d) => <option key={d} value={d}>{d}</option>)}
@@ -415,12 +424,23 @@ export function SubmitComplaintPage() {
                             {Math.round(aiResult.confidence)}%
                           </div>
                         </div>
+                        {form.category === 'Others' && (
+                          <div className="sm:col-span-2">
+                            <Input
+                              label="What category best describes this issue?"
+                              value={form.customCategory}
+                              onChange={(e) => setForm((f) => ({ ...f, customCategory: e.target.value }))}
+                              placeholder="e.g., Noise pollution, Stray animals, Signage..."
+                              required
+                            />
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                           {[
-                            { label: 'Category', value: aiResult.category },
+                            { label: 'Category', value: form.category === 'Others' && form.customCategory ? form.customCategory : aiResult.category },
                             { label: 'Priority', value: aiResult.priority },
                             { label: 'Department', value: aiResult.department },
                             { label: 'Confidence', value: `${Math.round(aiResult.confidence)}%` },
@@ -588,7 +608,7 @@ export function SubmitComplaintPage() {
 
               <div className="flex gap-3">
                 <Button variant="secondary" onClick={() => setStep('upload')}>Back</Button>
-                <Button className="flex-1" onClick={() => setStep('review')} disabled={!form.title || !form.description}>
+                <Button className="flex-1" onClick={() => setStep('review')} disabled={!form.title || !form.description || (form.category === 'Others' && !form.customCategory.trim())}>
                   Review Complaint
                 </Button>
               </div>
@@ -611,7 +631,7 @@ export function SubmitComplaintPage() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { label: 'Category', value: form.category },
+                    { label: 'Category', value: form.category === 'Others' && form.customCategory ? form.customCategory : form.category },
                     { label: 'Priority', value: form.priority },
                     { label: 'Department', value: form.department },
                     { label: 'AI Confidence', value: aiResult ? `${Math.round(aiResult.confidence)}%` : 'N/A' },
