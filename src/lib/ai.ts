@@ -227,22 +227,22 @@ function predictCategory(f: ImageFeatures): IssueCategory {
 
 function predictSeverity(f: ImageFeatures, category: IssueCategory): Severity {
   let score = 0;
-  // Darker images tend to be more severe
-  score += f.darkRatio * 50;
+  // Darker images tend to be more severe — but only very dark images should score high
+  score += f.darkRatio * 30;
   // High color variance = more damage visible
-  score += f.colorVariance * 0.3;
+  score += f.colorVariance * 0.15;
   // High edge density = more structural damage
-  score += f.edgeDensity * 40;
+  score += f.edgeDensity * 25;
 
-  // Category-based severity adjustments
+  // Category-based severity adjustments (smaller bonus so image features dominate)
   const highSeverityCategories: IssueCategory[] = ['Sewage Overflow', 'Road Damage', 'Potholes', 'Traffic Signal Damage'];
   const moderateCategories: IssueCategory[] = ['Garbage', 'Overflowing Garbage', 'Water Leakage', 'Drainage Blockage', 'Illegal Dumping'];
-  if (highSeverityCategories.includes(category)) score += 25;
-  else if (moderateCategories.includes(category)) score += 10;
+  if (highSeverityCategories.includes(category)) score += 15;
+  else if (moderateCategories.includes(category)) score += 5;
 
-  if (score >= 70) return 'Severe';
-  if (score >= 45) return 'High';
-  if (score >= 20) return 'Moderate';
+  if (score >= 80) return 'Severe';
+  if (score >= 55) return 'High';
+  if (score >= 30) return 'Moderate';
   return 'Low';
 }
 
